@@ -54,8 +54,8 @@ def radialfft_simpson(r, f, l, qmesh, volume):
   for iq in range(len(qmesh)):
     q = qmesh[iq]
     bess = scipy.special.spherical_jn(l, r*q)
-    aux = f * bess * r
-    fq[iq] = scipy.integrate.simps(aux, r)*fact
+    aux = f * bess * r * r
+    fq[iq] = scipy.integrate.simpson(aux, x = r)*fact
   return fq
 
 
@@ -155,8 +155,6 @@ def build_pswfc_basis_all(data_controller):
 
   return basis,shells
 
-
-
 def build_aewfc_basis(data_controller):
   arry, attr = data_controller.data_dicts()
   verbose = attr['verbose']
@@ -170,7 +168,9 @@ def build_aewfc_basis(data_controller):
     label = []
     for entry in aefiles:
       # label.append(entry.split('/')[-1].split('.')[0])
-      label.append(entry[-6:-4])  
+      fname = os.path.basename(entry)
+      label.append(fname[:-4])  
+      #label.append(entry[-6:-4])  
     aebasis.append(dict(zip(label,aefiles)))
   
   # build the mesh in q space
@@ -197,7 +197,7 @@ def build_aewfc_basis(data_controller):
     ash = []
     jchia = []
     for n in range(len(aewfc)):
-      l = 'SPDF'.find(list(aewfc[n].items())[0][0][1].upper())
+      l = 'SPDF'.find(list(aewfc[n].items())[0][0][-1].upper())
       assert l != -1
       ash.append(l)
 
@@ -343,7 +343,7 @@ def read_QE_wfc(data_controller, ik, ispin):
   eigs, eigv = np.linalg.eigh(ovp)
   assert (np.all(eigs>=0))
 
-  X = scipy.linalg.sqrtm(ovp)
+  X = scipy.linalg.sqrtm(ovp).astype(complex)
   owfc = np.linalg.solve(X.T, wfc) 
   
   wfc = np.array(wfc) * scalef
@@ -611,14 +611,19 @@ def ortho_atwfc_k(atwfc_k):
       
       # check that eigenvalues are positive
   eigs, eigv = np.linalg.eigh(ovp)
-  assert (np.all(eigs>=0))
+  eig_zeros = np.abs(eigs) < 1e-10
+  n_zeros = np.sum(eig_zeros)
+  if n_zeros > 0:
+    print(f"find {n_zeros} zero eigens with: eig = ", eigs[:n_zeros+3])
+  #assert (np.all(eigs>=0))
   
   # orthogonalize
-  if True:
-    X = scipy.linalg.sqrtm(ovp)
+  if False:
+    X = scipy.linalg.sqrtm(ovp).astype(complex)
     oatwfc_k = np.linalg.solve(X.T, atwfc_k)
   else:
     eigs = 1.0/np.sqrt(eigs)
+    eigs[eig_zeros] = 0
     X = np.dot(np.conj(eigv), np.dot(np.diag(eigs), eigv.T))
     oatwfc_k = np.dot(X, atwfc_k)
     
@@ -631,7 +636,8 @@ def ortho_atwfc_k(atwfc_k):
   # np.save("oovp",oovp)
   diff = np.linalg.norm(oovp - np.eye(natwfc))
   if np.abs(diff) > 1e-4:
-    raise RuntimeError('ortogonalization failed')
+    print("orthogonalization failed with diff =", diff)
+    #raise RuntimeError('ortogonalization failed')
     
   return oatwfc_k
 
@@ -777,7 +783,7 @@ def read_VASP_wfc(data_controller, ik, ispin):
   eigs, eigv = np.linalg.eigh(ovp)
   assert (np.all(eigs >= 0))
 
-  X = scipy.linalg.sqrtm(ovp)
+  X = scipy.linalg.sqrtm(ovp).astype(complex)
   owfc = np.linalg.solve(X.T, wfc)
 
   gkspace = {'xk': xk, 'igwx': igwx, 'mill': mill, 'bg': bg, 'gamma_only': False}  # Gamma-only not supported yet

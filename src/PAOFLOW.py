@@ -87,7 +87,8 @@ class PAOFLOW:
     if self.rank == 0:
       header()
       self.start_time = self.reset_time = time()
-
+      print("read from ", savedir)
+    
     # Initialize Data Controller
     self.data_controller = DataController(workpath, outputdir, inputfile, model, savedir, npool, smearing, acbn0, verbose, restart, dft)
 
